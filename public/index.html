@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title></title>
+  </head>
+  <body>
+    <form>
+      <input type="file">
+    </form>
+    <script type="text/javascript">
+      let cursor;
+      let fileSize;
+      const chunkSize = 1024 * 256;
+
+      function sliceFile(file, onChunk, onLastChunk) {
+
+        fileSize = file.size;
+        cursor = 0;
+        readChunk(file, onChunk, onLastChunk);
+      }
+
+      function readChunk(file, onChunk, onLastChunk) {
+        const start = cursor;
+        const last = chunkSize + cursor > fileSize;
+        const end = (last ? fileSize - cursor: chunkSize) + start;
+        const fileSlice = file.slice(start, end);
+
+        if (last) {
+          onLastChunk(fileSlice);
+        } else {
+          onChunk(fileSlice, retry => {
+            cursor = retry ? cursor: cursor + chunkSize;
+            readChunk(file, onChunk, onLastChunk);
+          });
+        }
+      }
+
+
+      document.querySelector("input").addEventListener("change", function(evt) {
+        const file = evt.target.files[0];
+        sliceFile(file,
+          function(chunk, retry) {
+
+            sendChunk(file, chunk, retry);
+          },
+          function(chunk) {
+            sendChunk(file, chunk)
+
+          }
+        )
+      })
+
+      function sendChunk(file, chunk, success) {
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", "/upload", true);
+
+        //Send the proper header information along with the request
+        xhr.setRequestHeader("session", `${Date.now()}_${btoa(file.name)}`);
+        if(!success) {
+          xhr.setRequestHeader("filename", file.name);
+        }
+
+        xhr.onreadystatechange = function() {//Call a function when the state changes.
+            if(xhr.readyState == XMLHttpRequest.DONE && xhr.status == 200) {
+                if(success) success();
+            }
+        }
+        xhr.send(chunk);
+      }
+
+
+    </script>
+  </body>
+</html>
