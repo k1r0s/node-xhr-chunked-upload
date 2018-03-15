@@ -24,12 +24,13 @@ server.on("request",
     const filename = request.headers["filename"];
     const session = request.headers["session"];
     const [timestamp, sessionid] = session.split("_");
-    let body = "";
+    const body = [];
 
-    request.on("data", d => body = body.concat(d));
+    request.on("data", d => body.push(d));
     request.on("end", () => {
+      const bodyBuffer = Buffer.concat(body);
       if(filename) {
-        sessions[sessionid].end(body, undefined, _ => {
+        sessions[sessionid].end(bodyBuffer, undefined, _ => {
           delete sessions[sessionid];
           fs.rename(sessionid, filename, end);
         });
@@ -37,9 +38,9 @@ server.on("request",
         if (!sessions[sessionid]) {
           sessions[sessionid] = fs.createWriteStream(sessionid);
           sessions[sessionid].on("open", _ =>
-            sessions[sessionid].write(body, undefined, end));
+            sessions[sessionid].write(bodyBuffer, undefined, end));
         } else {
-          sessions[sessionid].write(body, undefined, end);
+          sessions[sessionid].write(bodyBuffer, undefined, end);
         }
       }
     });
